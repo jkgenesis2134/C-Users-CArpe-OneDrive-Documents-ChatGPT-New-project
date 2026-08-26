@@ -24,12 +24,15 @@ module.exports = async function handler(req, res) {
   try {
     const response = await fetch('https://api.openai.com/v1/responses', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${process.env.OPENAI_API_KEY}`}, body:JSON.stringify({ model:process.env.OPENAI_MODEL || 'gpt-5.4', store:false, input:prompt, text:{format:{type:'json_schema',name:'careermaker_evaluation',strict:true,schema:evaluationSchema}} }) });
     const data = await response.json();
-    if (!response.ok) return res.status(502).json({error:'AI provider request failed', detail:data?.error?.message || 'Unknown provider error'});
-    const output = data.output_text || '';
-    let evaluation;
-    try { evaluation = JSON.parse(output); } catch { return res.status(502).json({error:'AI provider returned invalid structured output'}); }
-    return res.status(200).json({evaluation, provider:'openai', model:data.model || process.env.OPENAI_MODEL || 'configured-model'});
-  } catch (error) {
-    return res.status(502).json({error:'AI provider is temporarily unavailable'});
-  }
-};
+    if (!response.ok) {
+      const providerMessage = typeof data?.error?.message === 'string' ? data.error.message : 'The AI provider rejected the request.';
+      const providerCode = typeof data?.error?.code === 'string' ? data.error.code : undefined;
+      console.error('OpenAI request failed', { status: response.status, code: providerCode, message: providerMessage });
+      return res.status(502).json({
+        error: 'AI provider request failed',
+        detail: providerMessage,
+        providerStatus: response.status,
+        providerCode
+      });
+    }
+    const output = data.out
