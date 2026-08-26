@@ -68,7 +68,7 @@ action.addEventListener('click', () => {
   const clean = text.replace(/\s+/g, ' ');
   action.disabled = true; action.innerHTML = 'Analyzing <span>…</span>';
   setTimeout(async () => {
-  if (mode === 'Improve') { const aiEvaluation = await requestAiEvaluation(clean); if (aiEvaluation) renderAiEvaluation(aiEvaluation); else renderEvaluation(clean); }
+  if (mode === 'Improve') { const aiResult = await requestAiEvaluation(clean); if (aiResult.evaluation) renderAiEvaluation(aiResult.evaluation); else { resultTitle.textContent = 'AI connection error'; resultText.textContent = aiResult.error || 'The AI evaluation could not be completed.'; result.hidden = false; } }
   else {
     const outputs = { Simplify: `In simpler words: “${clean.replace(/utilize/gi,'use').replace(/in order to/gi,'to')}”`, Summarize: `The core idea is: ${clean.split(/[.!?]/)[0].trim()}.`, Grammar: `A polished version: “${clean.charAt(0).toUpperCase()+clean.slice(1).replace(/[.!?]?$/, '.') }”`, Humanize: `A more natural, conversational version: “${clean.replace(/furthermore/gi,'also').replace(/in conclusion/gi,'ultimately').replace(/it is important to note that/gi,'')}”`, Formalize: `A more formal version: “${clean.replace(/a lot of/gi,'many').replace(/get/gi,'obtain').replace(/show/gi,'demonstrate').replace(/can't/gi,'cannot')}”` };
     resultTitle.textContent = mode === 'Summarize' ? 'The core idea' : mode === 'Grammar' ? 'Grammar pass' : mode === 'Simplify' ? 'A simpler version' : mode === 'Humanize' ? 'A more natural version' : 'A more formal version';
@@ -117,7 +117,12 @@ function renderEvaluation(text){
 }
 
 async function requestAiEvaluation(text){
-  try { const response = await fetch('/api/analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})}); if (!response.ok) return null; const data = await response.json(); return data.evaluation || null; } catch { return null; }
+  try {
+    const response = await fetch('/api/analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return {error: data.detail || data.error || `The AI service returned status ${response.status}.`};
+    return {evaluation: data.evaluation || null, error: data.evaluation ? '' : 'The AI service returned no evaluation.'};
+  } catch { return {error:'The AI service could not be reached. Check the deployment logs.'}; }
 }
 
 function renderAiEvaluation(evaluation){
